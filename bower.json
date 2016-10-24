@@ -3,7 +3,13 @@
   "description": "Element to invite a new delivery agent on the Ordercloud platform",
   "main": "oc-delivery-agent-new.html",
   "dependencies": {
-    "polymer": "Polymer/polymer#^1.4.0"
+    "polymer": "Polymer/polymer#^1.4.0",
+    "oc-delivery-agent-api": "git://github.com/oc-elements/oc-delivery-agent-api#1.x",
+    "oc-user-api": "git://github.com/oc-elements/oc-user-api#1.x",
+    "paper-button": "PolymerElements/paper-button#^1.0.14",
+    "paper-input": "PolymerElements/paper-input#^1.1.20",
+    "paper-progress": "PolymerElements/paper-progress#^1.0.9",
+    "paper-material": "PolymerElements/paper-material#^1.0.6"
   },
   "devDependencies": {
     "iron-component-page": "PolymerElements/iron-component-page#^1.0.0",

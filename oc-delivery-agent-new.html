@@ -1,5 +1,12 @@
 <link rel="import" href="../polymer/polymer.html">
 
+<link rel="import" href="../paper-button/paper-button.html">
+<link rel="import" href="../paper-input/paper-input.html">
+<link rel="import" href="../oc-delivery-agent-api/oc-delivery-agent-api.html">
+<link rel="import" href="../oc-user-api/oc-user-api.html">
+<link rel="import" href="../paper-progress/paper-progress.html">
+<link rel="import" href="../paper-material/paper-material.html">
+
 <!--
 `oc-delivery-agent-new`
 Element to invite a new delivery agent on the Ordercloud platform
@@ -14,19 +21,51 @@ Element to invite a new delivery agent on the Ordercloud platform
         display: block;
       }
     </style>
-    <h2>Hello [[prop1]]</h2>
+
+    <oc-delivery-agent-api id="deliveryApi"></oc-delivery-agent-api>
+    <oc-user-api id="userApi"></oc-user-api>
+
+    <paper-progress indeterminate hidden$="[[ !loading ]]"></paper-progress>
+    <paper-material>
+      <paper-input label="Search" always-float-label></paper-input>
+    </paper-material>
+
   </template>
 
   <script>
     Polymer({
 
       is: 'oc-delivery-agent-new',
+      behaviors: [OC.Behaviours.ApiConsumer],
 
       properties: {
-        prop1: {
-          type: String,
-          value: 'oc-delivery-agent-new',
+        organisationId: Number,
+        loading: {
+          type: Boolean,
+          notify: true
         },
+
+      },
+
+      observers : [
+        'refresh(organisationId)'
+      ],
+
+      refresh : function(){
+
+        if(!this.userId || !this.organisationId) return;
+
+        this._getDeliveryAgent(this.organisationId, this.userId);
+
+      },
+
+      _getDeliveryAgent : function(organisationId, userId) {
+        this.loading = true;
+
+        this.$.deliveryApi.getDeliveryAgent(organisationId, userId)
+                .then(this._setPropertyResponse.bind(this, 'agentData'))
+                .catch(this.fire.bind(this, 'delivery-agents-error', 'Failed to load delivery agent details'))
+                .finally(this.set.bind(this, 'loading', false));
       },
 
     });
