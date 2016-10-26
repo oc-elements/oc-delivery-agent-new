@@ -4,14 +4,13 @@
 <link rel="import" href="../paper-input/paper-input.html">
 <link rel="import" href="../oc-delivery-agent-api/oc-delivery-agent-api.html">
 <link rel="import" href="../oc-user-api/oc-user-api.html">
-<link rel="import" href="../paper-progress/paper-progress.html">
-<link rel="import" href="../paper-material/paper-material.html">
+
 
 <!--
 `oc-delivery-agent-new`
 Element to invite a new delivery agent on the Ordercloud platform
 
-@demo demo/index.html 
+@demo demo/index.html
 -->
 
 <dom-module id="oc-delivery-agent-new">
@@ -20,15 +19,99 @@ Element to invite a new delivery agent on the Ordercloud platform
       :host {
         display: block;
       }
+
+      .search-box {
+        display: flex;
+        flex-direction: row;
+      }
+
+      .search-box paper-input {
+        flex-grow: 1;
+        margin-right: 15px;
+      }
+
+      paper-button {
+        background: var(--primary-color);
+        color: #fff;
+      }
+
+      .search-results {
+        padding: 10px;
+        margin-top: 20px;
+        border-top: 1px solid #ddd;
+      }
+
+      .user-profile {
+        border: 1px solid #ddd;
+        padding: 10px;
+        display: flex;
+        flex-direction: row;
+        width: 30%;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .user-profile div {
+      }
+
+      .user-profile div p {
+        font-size: 12px;
+      }
+
+      .user-profile img {
+        margin-right: 10px;
+      }
+
+      .user-profile paper-button {
+        height: 40px;
+        margin-top: 10px;
+        width: 100%;
+      }
+
+      iron-icon {
+        margin-right: 10px;
+      }
+
+
+
+
     </style>
 
     <oc-delivery-agent-api id="deliveryApi"></oc-delivery-agent-api>
     <oc-user-api id="userApi"></oc-user-api>
 
-    <paper-progress indeterminate hidden$="[[ !loading ]]"></paper-progress>
-    <paper-material>
-      <paper-input label="Search" always-float-label></paper-input>
-    </paper-material>
+    <section class="search-box">
+      <paper-input
+              label="Search For Delivery Agents"
+              value="{{query}}"
+              always-float-label
+              placeholder="please enter user email address or cellphone number"
+      ></paper-input>
+      <paper-button on-tap="_getUserProfile" raised>Search</paper-button>
+    </section>
+
+
+    <section hidden$="{{!_searched}}" class="search-results">
+      <div hidden$="{{!_hasSearchResults}}">
+        <div class="user-profile">
+          <img src$="[[_computeProfileImage(userProfile.imageThumbnail)]]" alt="">
+          <div>
+            <p><iron-icon icon="icons:account-box"></iron-icon><span>[[userProfile.firstName]]</span> <span>[[userProfile.surname]]</span></p>
+            <p><iron-icon icon="icons:mail"></iron-icon><span>[[userProfile.cellphoneNumber]]</span></p>
+            <p><iron-icon icon="communication:call"></iron-icon><span>[[userProfile.email]]</span></p>
+          </div>
+
+          <paper-button disabled$="[[_isUserAnAgent]]" class="primary-btn" on-tap="_inviteAgent" raised>{{_computeBtnMessage(_isUserAnAgent)}}</paper-button>
+        </div>
+
+
+      </div>
+
+      <div hidden$="{{_hasSearchResults}}">
+        <p>No users found that match that email address or cellphone number</p>
+      </div>
+
+    </section>
 
   </template>
 
@@ -45,6 +128,20 @@ Element to invite a new delivery agent on the Ordercloud platform
           notify: true
         },
 
+        query: String,
+        userProfile: Object,
+        deliveryAgents: Array,
+
+        _searched: {
+          type: Boolean,
+          value: false
+        },
+
+        _hasSearchResults: {
+          type: Boolean,
+          value: false
+        }
+
       },
 
       observers : [
@@ -53,20 +150,87 @@ Element to invite a new delivery agent on the Ordercloud platform
 
       refresh : function(){
 
-        if(!this.userId || !this.organisationId) return;
+        this.loading = false;
 
-        this._getDeliveryAgent(this.organisationId, this.userId);
+        if(!this.organisationId) return;
+
+        this._getDeliveryAgents(this.organisationId, 1, -1);
 
       },
 
-      _getDeliveryAgent : function(organisationId, userId) {
+      _getUserProfile : function(e) {
         this.loading = true;
 
-        this.$.deliveryApi.getDeliveryAgent(organisationId, userId)
-                .then(this._setPropertyResponse.bind(this, 'agentData'))
-                .catch(this.fire.bind(this, 'delivery-agents-error', 'Failed to load delivery agent details'))
+        var email = "",
+                mobile = "";
+
+        if(this._computeQueryType(this.query) === "email"){
+          email = this.query;
+        }else{
+          mobile = this.query;
+        }
+
+        this._searched = false;
+        this._hasSearchResults = false;
+        this._isUserAnAgent = false;
+        this.set('userProfile', {});
+
+        this.$.userApi.getProfileSearch(email, mobile)
+                .then(function(request){
+
+                  this._searched = true;
+                  this._hasSearchResults = (request.response.count > 0);
+                  this._isUserAnAgent = (this.deliveryAgents.filter(function(agent){ return (agent.user.id === request.response.results[0].id)}));
+
+                  this.set('userProfile', request.response.results[0].profile);
+                  this.set('userProfile.id', request.response.results[0].id);
+
+                }.bind(this))
+                .catch(this.fire.bind(this, 'delivery-agents-error', 'Failed to load user details'))
+                .finally(this.set.bind(this, 'loading', false));
+
+
+      },
+
+      _computeQueryType : function(query){
+        return ( typeof query === 'string' && query.indexOf('@') !== -1) ? "email" : "mobile";
+
+      },
+
+      _inviteAgent : function(e){
+        var userId = this.userProfile.id;
+
+        this.$.deliveryApi.inviteDeliveryAgent(this.organisationId, userId)
+                .then(function(request){
+                  this.toast("Delivery Invite has been sent");
+                }.bind(this))
+                .catch(this.fire.bind(this, 'delivery-agents-error', 'Failed to invite user'))
                 .finally(this.set.bind(this, 'loading', false));
       },
+
+      _computeHidden : function(param){
+        console.log(param);
+        return (param);
+      },
+
+      _computeProfileImage : function(image) {
+        return (image) ? image : "https://www.gravatar.com/avatar/ba2ef4697fee342517d97d47151d64fc.jpg?d=mm&s=120";
+      },
+
+      _getDeliveryAgents : function(orgId, page, pageSize) {
+        this.loading = true;
+        var criteria = {};
+        criteria.page = page || 1;
+        criteria.pageSize = pageSize || -1;
+        this.$.deliveryApi.getDeliveryAgents(orgId, criteria)
+                .then(this._setPropertyResponseResults.bind(this, 'deliveryAgents'))
+                .catch(this.fire.bind(this, 'delivery-agents-error', 'Failed to load existing delivery agents'))
+                .finally(this.set.bind(this, 'loading', false));
+      },
+
+      _computeBtnMessage: function(value){
+        return (value) ? 'User is a delivery agent' : 'Add delivery agent';
+      }
 
     });
   </script>
